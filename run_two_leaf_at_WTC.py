@@ -29,64 +29,90 @@ def run_treatment(T, df, footprint):
     hod = df.hod
     ndays = int(len(days) / 24.)
 
-    dummy = np.ones(ndays) * np.nan
-    out = pd.DataFrame({'year':dummy, 'doy':dummy, 'An':dummy, 'E':dummy,
-                        'An_obs':dummy, 'E_obs':dummy})
-
-    An_store = np.zeros(ndays)
-    E_store = np.zeros(ndays)
-    An_store_obs = np.zeros(ndays)
-    E_store_obs = np.zeros(ndays)
-
-    an_conv = c.UMOL_TO_MOL * c.MOL_C_TO_GRAMS_C * c.SEC_TO_HR
-    et_conv = c.MOL_WATER_2_G_WATER * c.G_TO_KG * c.SEC_TO_HR
-
-    # Add an LAI field, i.e. converting from per tree to m2 m-2
-    df = df.assign(LAI = lambda x: x.leafArea/footprint)
+    out = setup_output_dataframe(ndays)
 
     i = 0
     j = 0
     while i < len(df):
         year = df.index.year[i]
         doy = df.doy[i]
-
-        Anx = 0.0
-        Ex = 0.0
-        An_obs = 0.0
-        Ex_obs = 0.0
         hod = 0
         for k in range(24):
 
-            (An, gsw,
-             et, tcan,
-             _,_,_,_,_,_) = T.main(df.tair[i], df.par[i], df.vpd[i], wind,
-                                   pressure, Ca, doy, hod, lat, lon,
-                                   df.LAI[i])
+            (An, et, Tcan,
+             apar, lai_leaf) = T.main(df.tair[i], df.par[i], df.vpd[i],
+                                       wind, pressure, Ca, doy, hod, lat,
+                                       lon, df.LAI[i])
 
-            Anx += An * an_conv
-            Ex += et * et_conv
-
-            # Convert from per tree to m-2
-            An_obs += df.FluxCO2[i] * c.MMOL_2_UMOL * an_conv / footprint
-            Ex_obs += df.FluxH2O[i] * et_conv / footprint
+            out = update_output_hourly(i, j, An, et, Tcan, apar, lai_leaf, df,
+                                       footprint, out)
 
             hod += 1
             i += 1
 
-        out.year[i] = year
-        out.doy[i] = doy
-        out.An[i] = Anx
-        out.E[i] = Ex
-        out.An_obs[i] = An_obs
-        out.E_obs[i] = Ex_obs
+        out = update_output_daily(j, year, doy, out)
         j += 1
 
     return (out)
 
+def setup_output_dataframe(ndays):
+
+    zero = np.zeros(ndays)
+    out = pd.DataFrame({'year':zero, 'doy':zero,
+                        'An_obs':zero, 'E_obs':zero,
+                        'An_can':zero, 'An_sun':zero, 'An_sha':zero,
+                        'E_can':zero, 'E_sun':zero, 'E_sha':zero,
+                        'T_can':zero, 'T_sun':zero, 'T_sha':zero,
+                        'APAR_can':zero, 'APAR_sun':zero, 'APAR_sha':zero,
+                        'LAI_can':zero, 'LAI_sun':zero, 'LAI_sha':zero})
+    return (out)
+
+def update_output_hourly(i, j, An, et, Tcan, apar, lai_leaf, df, footprint, out):
+
+    an_conv = c.UMOL_TO_MOL * c.MOL_C_TO_GRAMS_C * c.SEC_TO_HR
+    et_conv = c.MOL_WATER_2_G_WATER * c.G_TO_KG * c.SEC_TO_HR
+    sun_frac = lai_leaf[c.SUNLIT] / np.sum(lai_leaf)
+    sha_frac = lai_leaf[c.SHADED] / np.sum(lai_leaf)
+
+    out.An_can[j] += np.sum(An) * an_conv
+    out.An_sun[j] += An[c.SUNLIT] * an_conv
+    out.An_sha[j] += An[c.SHADED] * an_conv
+    out.E_can[j] += np.sum(et) * et_conv
+    out.E_sun[j] += et[c.SUNLIT] * et_conv
+    out.E_sha[j] += et[c.SHADED] * et_conv
+    out.T_can[j] += (Tcan[c.SUNLIT] * sun_frac) + (Tcan[c.SHADED] * sha_frac)
+    out.T_sun[j] += Tcan[c.SUNLIT]
+    out.T_sha[j] += Tcan[c.SHADED]
+    out.APAR_can[j] += np.sum(apar)
+    out.APAR_sun[j] += apar[c.SUNLIT]
+    out.APAR_sha[j] += apar[c.SHADED]
+    out.LAI_can[j] += np.sum(lai_leaf)
+    out.LAI_sun[j] += lai_leaf[c.SUNLIT]
+    out.LAI_sha[j] += lai_leaf[c.SHADED]
+
+    # Convert from per tree to m-2
+    out.An_obs[j] += df.FluxCO2[i] * c.MMOL_2_UMOL * an_conv / footprint
+    out.E_obs[j] += df.FluxH2O[i] * et_conv / footprint
+
+    return out
+
+def update_output_daily(j, year, doy, out):
+
+    out.year[j] = year
+    out.doy[j] = doy
+    out.T_can[j] /= 24.
+    out.T_sun[j] /= 24.
+    out.T_sha[j] /= 24.
+    out.LAI_can[j] /= 24.
+    out.LAI_sun[j] /= 24.
+    out.LAI_sha[j] /= 24.
+
+    return out
 
 if __name__ == "__main__":
 
-
+    output_dir = "outputs"
+    ofname = os.path.join(output_dir, "wtc_two_leaf.csv")
     fpath = "/Users/mdekauwe/Downloads/"
     fname = "met_data.csv"
     fn = os.path.join(fpath, fname)
@@ -119,6 +145,9 @@ if __name__ == "__main__":
     diameter = 3.25 # chamber
     footprint = np.pi * (diameter / 2.)**2 # to convert from tree to m2
 
+    # Add an LAI field, i.e. converting from per tree to m2 m-2
+    df = df.assign(LAI = lambda x: x.leafArea/footprint)
+
     T = TwoLeaf(g0, g1, D0, gamma, Vcmax25, Jmax25, Rd25, Eaj, Eav, deltaSj,
                 deltaSv, Hdv, Hdj, Q10, leaf_width, SW_abs, gs_model="medlyn")
 
@@ -128,10 +157,14 @@ if __name__ == "__main__":
              (df.Water_treatment == "control") &
              (df.chamber == "C01")]
 
-
     (out) = run_treatment(T, dfx, footprint)
 
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
 
+    if os.path.isfile(ofname):
+        os.remove(self.out_fname)
+    out.to_csv(ofname, index=False)
 
     import matplotlib.pyplot as plt
     fig = plt.figure(figsize=(16,4))
@@ -149,13 +182,13 @@ if __name__ == "__main__":
     ax1 = fig.add_subplot(121)
     ax2 = fig.add_subplot(122)
 
-    ax1.plot(out.An, label="Model")
+    ax1.plot(out.An_can, label="Model")
     ax1.plot(out.An_obs, label="Observations")
     ax1.set_ylabel("GPP (g C m$^{-2}$ d$^{-1}$)")
     ax1.set_xlabel("Days", position=(1.1, 0.5))
     ax1.legend(numpoints=1, loc="best")
 
-    ax2.plot(out.E, label="Model")
+    ax2.plot(out.E_can, label="Model")
     ax2.plot(out.E_obs, label="Observations")
     ax2.set_ylabel("E (mm d$^{-1}$)")
 
