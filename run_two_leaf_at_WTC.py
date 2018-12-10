@@ -73,7 +73,6 @@ def update_output_hourly(i, j, An, et, Tcan, apar, lai_leaf, df, footprint, out)
     et_conv = c.MOL_WATER_2_G_WATER * c.G_TO_KG * c.SEC_TO_HR
     sun_frac = lai_leaf[c.SUNLIT] / np.sum(lai_leaf)
     sha_frac = lai_leaf[c.SHADED] / np.sum(lai_leaf)
-
     out.An_can[j] += np.sum(An) * an_conv
     out.An_sun[j] += An[c.SUNLIT] * an_conv
     out.An_sha[j] += An[c.SHADED] * an_conv
@@ -112,12 +111,11 @@ def update_output_daily(j, year, doy, out):
 if __name__ == "__main__":
 
     output_dir = "outputs"
-    ofname = os.path.join(output_dir, "wtc_two_leaf.csv")
     fpath = "/Users/mdekauwe/Downloads/"
-    fname = "met_data.csv"
+    fname = "met_data_gap_fixed.csv"
     fn = os.path.join(fpath, fname)
     df = pd.read_csv(fn)
-    df = df.drop(df.columns[0], axis=1)
+    #df = df.drop(df.columns[0], axis=1)
     df.index = pd.to_datetime(df.DateTime)
 
     #
@@ -151,48 +149,22 @@ if __name__ == "__main__":
     T = TwoLeaf(g0, g1, D0, gamma, Vcmax25, Jmax25, Rd25, Eaj, Eav, deltaSj,
                 deltaSv, Hdv, Hdj, Q10, leaf_width, SW_abs, gs_model="medlyn")
 
-    # Not sure which treatments Dushan wants to run, so will just use this one
-    # Easy to edit as I'm passing to a func
-    dfx = df[(df.T_treatment == "ambient") &
-             (df.Water_treatment == "control") &
-             (df.chamber == "C01")]
+    chambers = np.unique(df.chamber)
+    chambers = ["C01"]
+    for chamber in chambers:
+        print(chamber)
+        dfx = df[(df.T_treatment == "ambient") &
+                 (df.Water_treatment == "control") &
+                 (df.chamber == chamber)].copy()
 
-    (out) = run_treatment(T, dfx, footprint)
+        (out) = run_treatment(T, dfx, footprint)
 
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
+        if not os.path.exists(output_dir):
+            os.mkdir(output_dir)
 
-    if os.path.isfile(ofname):
-        os.remove(ofname)
-    out.to_csv(ofname, index=False)
+        ofname = os.path.join(output_dir, "wtc_two_leaf_%s.csv" % (chamber))
+        if os.path.isfile(ofname):
+            os.remove(ofname)
+        out.to_csv(ofname, index=False)
 
-    import matplotlib.pyplot as plt
-    fig = plt.figure(figsize=(16,4))
-    fig.subplots_adjust(hspace=0.1)
-    fig.subplots_adjust(wspace=0.2)
-    plt.rcParams['text.usetex'] = False
-    plt.rcParams['font.family'] = "sans-serif"
-    plt.rcParams['font.sans-serif'] = "Helvetica"
-    plt.rcParams['axes.labelsize'] = 14
-    plt.rcParams['font.size'] = 14
-    plt.rcParams['legend.fontsize'] = 14
-    plt.rcParams['xtick.labelsize'] = 14
-    plt.rcParams['ytick.labelsize'] = 14
-
-    ax1 = fig.add_subplot(121)
-    ax2 = fig.add_subplot(122)
-
-    ax1.plot(out.An_can, label="Model")
-    ax1.plot(out.An_obs, label="Observations")
-    ax1.set_ylabel("GPP (g C m$^{-2}$ d$^{-1}$)")
-    ax1.set_xlabel("Days", position=(1.1, 0.5))
-    ax1.legend(numpoints=1, loc="best")
-
-    ax2.plot(out.E_can, label="Model")
-    ax2.plot(out.E_obs, label="Observations")
-    ax2.set_ylabel("E (mm d$^{-1}$)")
-
-    ax1.locator_params(nbins=6, axis="y")
-    ax2.locator_params(nbins=6, axis="y")
-
-    plt.show()
+    
