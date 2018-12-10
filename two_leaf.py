@@ -230,14 +230,8 @@ class Canopy(object):
         # convert from mm s-1 to mol m-2 s-1
         cmolar = pressure / (c.RGAS * tair_k)
 
-        if rnet is None:
-            rnet = PM.calc_rnet(par, tair, tair_k, tleaf_k, vpd, pressure)
-
         (grn, gh, gbH, gw) = PM.calc_conductances(p, tair_k, tleaf, tair,
                                                   wind, gsc, cmolar, lai)
-
-        # Update net radiation for canopy
-        rnet -= c.CP * c.AIR_MASS * (tleaf_k - tair_k) * grn
 
         if np.isclose(gsc, 0.0):
             et = 0.0
@@ -258,5 +252,11 @@ class Canopy(object):
         # leaf-air temperature difference recalculated from energy balance.
         # NB. I'm using gh here to include grn and the doubling of conductances
         new_Tleaf = tair + H / (c.CP * air_density * (gh / cmolar))
+
+        # Update leaf temperature:
+        new_tleaf_k = tleaf_k + (new_Tleaf + c.DEG_2_KELVIN)
+
+        # Update net radiation for canopy
+        rnet -= c.CP * c.AIR_MASS * (new_tleaf_k - tair_k) * grn
 
         return (new_Tleaf, et, le_et, gbH, gw)
