@@ -31,7 +31,7 @@ __version__ = "1.0 (09.11.2018)"
 __email__   = "mdekauwe@gmail.com"
 
 
-class CoupledModel(object):
+class Canopy(object):
     """Iteratively solve leaf temp, Ci, gs and An."""
 
     def __init__(self, p, peaked_Jmax=True, peaked_Vcmax=True, model_Q10=True,

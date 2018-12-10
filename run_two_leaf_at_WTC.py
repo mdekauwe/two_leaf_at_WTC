@@ -13,7 +13,7 @@ import pandas as pd
 import constants as c
 import parameters as p
 from radiation import calculate_absorbed_radiation
-from two_leaf import CoupledModel as TwoLeaf
+from two_leaf import Canopy as TwoLeaf
 
 __author__  = "Martin De Kauwe"
 __version__ = "1.0 (07.12.2018)"
