@@ -163,7 +163,7 @@ if __name__ == "__main__":
         os.mkdir(output_dir)
 
     if os.path.isfile(ofname):
-        os.remove(self.out_fname)
+        os.remove(out_fname)
     out.to_csv(ofname, index=False)
 
     import matplotlib.pyplot as plt
