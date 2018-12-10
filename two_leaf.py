@@ -98,9 +98,8 @@ class Canopy(object):
         sw_rad = np.zeros(2) # VIS, NIR
         tcanopy = np.zeros(2)
 
-        cos_zenith = calculate_cos_zenith(doy, p.lat, hod)
-        zenith_angle = np.rad2deg(np.arccos(cos_zenith))
-        elevation = 90.0 - zenith_angle
+        (cos_zenith, elevation) = calculate_cos_zenith(doy, p.lat, hod)
+
         sw_rad[c.VIS] = 0.5 * (par * c.PAR_2_SW) # W m-2
         sw_rad[c.NIR] = 0.5 * (par * c.PAR_2_SW) # W m-2
 
@@ -167,6 +166,7 @@ class Canopy(object):
 
                     # Check for convergence...?
                     if math.fabs(Tleaf - new_tleaf) < 0.02:
+                        Tcan[ileaf] = Tleaf
                         break
 
                     if iter > self.iter_max:
