@@ -11,6 +11,7 @@ import math
 import pandas as pd
 
 import constants as c
+import parameters as p
 from radiation import calculate_absorbed_radiation
 from two_leaf import CoupledModel as TwoLeaf
 
@@ -19,11 +20,7 @@ __version__ = "1.0 (07.12.2018)"
 __email__   = "mdekauwe@gmail.com"
 
 
-def run_treatment(T, df, footprint):
-
-    wind = 5.0
-    pressure = 101325.0
-    Ca = 400.0
+def run_treatment(T, df, p, wind, pressure, Ca):
 
     days = df.doy
     hod = df.hod
@@ -40,12 +37,11 @@ def run_treatment(T, df, footprint):
         for k in range(24):
 
             (An, et, Tcan,
-             apar, lai_leaf) = T.main(df.tair[i], df.par[i], df.vpd[i],
-                                       wind, pressure, Ca, doy, hod, lat,
-                                       lon, df.LAI[i])
+             apar, lai_leaf) = T.main(p, df.tair[i], df.par[i], df.vpd[i], wind,
+                                      pressure, Ca, doy, hod, df.lai[i])
 
             out = update_output_hourly(i, j, An, et, Tcan, apar, lai_leaf, df,
-                                       footprint, out)
+                                       p.footprint, out)
 
             hod += 1
             i += 1
@@ -118,36 +114,16 @@ if __name__ == "__main__":
     #df = df.drop(df.columns[0], axis=1)
     df.index = pd.to_datetime(df.DateTime)
 
-    #
-    ## Parameters - Dushan to set these ...
-    #
-    lat = -33.617778 # Ellsworth 2017, NCC
-    lon = 150.740278
-    g0 = 1E-09
-    g1 = 3.8
-    D0 = 1.5 # kpa # Not used so ignore ...
-    Vcmax25 = 81.706
-    Jmax25 = Vcmax25 * 1.67
-    Rd25 = 2.0  # Need to discuss what you want here, "None" -> Vcmax = 0.015 Rd
-    Eaj = 30000.0
-    Eav = 60000.0
-    deltaSj = 650.0
-    deltaSv = 650.0
-    Hdv = 200000.0
-    Hdj = 200000.0
-    Q10 = 2.0
-    gamma = 0.0
-    leaf_width = 0.02
-    SW_abs = 0.8 # use canopy absorptance of solar radiation, not used anyway...
-
-    diameter = 3.25 # chamber
-    footprint = np.pi * (diameter / 2.)**2 # to convert from tree to m2
-
     # Add an LAI field, i.e. converting from per tree to m2 m-2
-    df = df.assign(LAI = lambda x: x.leafArea/footprint)
+    df = df.assign(lai = lambda x: x.leafArea / p.footprint)
 
-    T = TwoLeaf(g0, g1, D0, gamma, Vcmax25, Jmax25, Rd25, Eaj, Eav, deltaSj,
-                deltaSv, Hdv, Hdj, Q10, leaf_width, SW_abs, gs_model="medlyn")
+    ##  Fixed met stuff
+    #
+    wind = 2.5
+    pressure = 101325.0
+    Ca = 400.0
+
+    T = TwoLeaf(p, gs_model="medlyn")
 
     chambers = np.unique(df.chamber)
     chambers = ["C01"]
@@ -157,7 +133,7 @@ if __name__ == "__main__":
                  (df.Water_treatment == "control") &
                  (df.chamber == chamber)].copy()
 
-        (out) = run_treatment(T, dfx, footprint)
+        (out) = run_treatment(T, dfx, p, wind, pressure, Ca)
 
         if not os.path.exists(output_dir):
             os.mkdir(output_dir)
@@ -166,5 +142,3 @@ if __name__ == "__main__":
         if os.path.isfile(ofname):
             os.remove(ofname)
         out.to_csv(ofname, index=False)
-
-    
