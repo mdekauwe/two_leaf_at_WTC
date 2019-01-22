@@ -124,6 +124,10 @@ class FarquharC3(object):
         else:
             Rd = 0.015 * Vcmax
 
+        if self.adjust_for_low_temp:
+            Jmax = self.adj_for_low_temp(Jmax, Tleaf)
+            Vcmax = self.adj_for_low_temp(Vcmax, Tleaf)
+
         # Scaling from single leaf to canopy, see Wang & Leuning 1998 appendix C
         if scalex is not None:
             Rd *= scalex
@@ -133,10 +137,6 @@ class FarquharC3(object):
         # Rate of electron transport, which is a function of absorbed PAR
         J = self.calc_electron_transport_rate(p, Par, Jmax)
         Vj = J / 4.0
-
-        if self.adjust_for_low_temp:
-            Jmax = self.adj_for_low_temp(Jmax, Tleaf)
-            Vcmax = self.adj_for_low_temp(Vcmax, Tleaf)
 
         if self.gs_model == "leuning":
             g0 = p.g0 * c.GSW_2_GSC
