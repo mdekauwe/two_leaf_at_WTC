@@ -8,11 +8,11 @@ lon = 150.740278
 
 # leaf transmissivity [-] (VIS: 0.07 - 0.15)
 # ENF: 0.05; EBF: 0.05; DBF: 0.05; C3G: 0.070
-tau = np.array([0.09, 0.3])
+tau = np.array([0.1, 0.3])
 
 # leaf reflectance [-] (VIS:0.07 - 0.15)
 # ENF: 0.062;EBF: 0.076;DBF: 0.092; C3G: 0.11
-refl = np.array([0.09, 0.3])
+refl = np.array([0.1, 0.3])
 
 # intercellular concentration of O2 [mmol mol-1]
 Oi = 210.0
@@ -45,21 +45,25 @@ Ear = None # 34000.0
 theta_hyperbol = 0.9995
 
 # Curvature of the light response (-)
-theta_J = 0.7
+# set to MAESTRA numbers
+theta_J = 0.57
 
 quantum_yield = 0.3
 
 absorptance = 1 - refl[0] - tau[0]
 
 # Leaf quantum yield (initial slope of the A-light response curve) [mol mol-1]
-alpha = quantum_yield * absorptance # (Medlyn et al 2002)
+# this value (0.246) is slightly lower than MAESTRA (0.26)
+# reflectance and transmittance should change to MAESTRA
 
+#alpha = quantum_yield * absorptance # (Medlyn et al 2002)
+alpha = 0.26
 # residual stomatal conductance as net assimilation rate reaches zero
 # (mol m-2 s-1)
-g0 = 0.001
+g0 = 0.0
 
 # slope of the sensitivity of stomatal conductance to assimilation (mol m-2 s-1)
-g1 = 3.8
+g1 = 2.43 # WTC3 estimates.
 
 # the sensitivity of stomatal conductance to D (kPa)
 D0 = 1.5
@@ -71,29 +75,31 @@ Hdv = 200000.0
 Hdj = 200000.0
 
 # max rate of rubisco activity at 25 deg or 298 K
-Vcmax25 = 81.706
+Vcmax25 = 103.6 # WTC estimates. Fitted to all ACi data
 
 # potential rate of electron transport at 25 deg or 298 K
-Jmax25 = Vcmax25 * 1.67
+Jmax25 = Vcmax25 * 1.72
 
 # Rspiration rate at the reference temperature 25 deg C or 298 K [deg K]
-Rd25 = 2.0
+
+Rd25 = 1.4 # Aspinwall et al 2016 New Phyt (WTC3 estimates)
+#Rd25 = 1.4*0.7 # DK reduce Rday 30%
 
 # ratio of respiration at a given temperature divided by respiration
 # at a temperature 10 degrees lower
 Q10 = 2.0
 
 # activation energy for the parameter [J mol-1]
-Eaj = 30000.0
+Eaj = 23800
 
 # activation energy for the parameter [J mol-1]
-Eav = 60000.0
+Eav = 59700
 
 # entropy factor [J mol-1 K-1)
-deltaSj = 650.0
+deltaSj = 627
 
 # entropy factor [J mol-1 K-1)
-deltaSv = 650.0
+deltaSv = 634
 
 # leaf width (m)
 leaf_width = 0.02
@@ -112,16 +118,16 @@ emissivity_leaf = 0.96
 emissivity_soil = 0.94
 
 # Table 3, Wang and Leuning, 1998
-soil_reflectance = 0.1
+soil_reflectance = 0.1 #(same as MAESTRA)
 
 # light extinction coefficient
 k = 0.5
 
 # extinction coefficient of nitrogen in the canopy, assumed to be 0.3 by
 # default which comes half Belinda's head and is supported by fig 10 in
-# Lloyd et al. Biogeosciences, 7, 1833–1859, 2010
+# Lloyd et al
 #kn = 0.3
-kn = 0.001
+kn = 0.001 #DK no extinction of nitrogen through canopy depth
 
 # empirical param related to the leaf angle dist (= 0 for spherical LAD)
 chi = 9.99999978E-03
