@@ -25,29 +25,24 @@ def run_treatment(T, df, p, wind, pressure, Ca):
     days = df.doy
     hod = df.hod
     ndays = int(len(days) / 24.)
+    nhours = len(df)
 
-    out = setup_output_dataframe(ndays)
+    out = setup_output_dataframe(nhours)
 
     i = 0
     j = 0
     while i < len(df):
         year = df.index.year[i]
         doy = df.doy[i]
-        hod = 0
-        for k in range(24):
+        hod = df.hod[i]
 
-            (An, et, Tcan,
-             apar, lai_leaf) = T.main(p, df.tair[i], df.par[i], df.vpd[i], wind,
-                                      pressure, Ca, doy, hod, df.lai[i])
+        (An, et, Tcan,
+         apar, lai_leaf) = T.main(p, df.tair[i], df.par[i], df.vpd[i], wind,
+                                  pressure, Ca, doy, hod, df.lai[i])
+        out = update_output_hourly(doy, i, An, et, Tcan, apar, lai_leaf, df,
+                                   p.footprint, out)
 
-            out = update_output_hourly(i, j, An, et, Tcan, apar, lai_leaf, df,
-                                       p.footprint, out)
-
-            hod += 1
-            i += 1
-
-        out = update_output_daily(j, year, doy, out)
-        j += 1
+        i += 1
 
     return (out)
 
@@ -63,18 +58,19 @@ def setup_output_dataframe(ndays):
                         'LAI_can':zero, 'LAI_sun':zero, 'LAI_sha':zero})
     return (out)
 
-def update_output_hourly(i, j, An, et, Tcan, apar, lai_leaf, df, footprint, out):
+def update_output_hourly(doy, j, An, et, Tcan, apar, lai_leaf, df, footprint,
+                         out):
 
-    an_conv = c.UMOL_TO_MOL * c.MOL_C_TO_GRAMS_C * c.SEC_TO_HR
-    et_conv = c.MOL_WATER_2_G_WATER * c.G_TO_KG * c.SEC_TO_HR
+    #an_conv = c.UMOL_TO_MOL * c.MOL_C_TO_GRAMS_C * c.SEC_TO_HR
+    #et_conv = c.MOL_WATER_2_G_WATER * c.G_TO_KG * c.SEC_TO_HR
     sun_frac = lai_leaf[c.SUNLIT] / np.sum(lai_leaf)
     sha_frac = lai_leaf[c.SHADED] / np.sum(lai_leaf)
-    out.An_can[j] += np.sum(An) * an_conv
-    out.An_sun[j] += An[c.SUNLIT] * an_conv
-    out.An_sha[j] += An[c.SHADED] * an_conv
-    out.E_can[j] += np.sum(et) * et_conv
-    out.E_sun[j] += et[c.SUNLIT] * et_conv
-    out.E_sha[j] += et[c.SHADED] * et_conv
+    out.An_can[j] += np.sum(An)
+    out.An_sun[j] += An[c.SUNLIT]
+    out.An_sha[j] += An[c.SHADED]
+    out.E_can[j] += np.sum(et)
+    out.E_sun[j] += et[c.SUNLIT]
+    out.E_sha[j] += et[c.SHADED]
     out.T_can[j] += (Tcan[c.SUNLIT] * sun_frac) + (Tcan[c.SHADED] * sha_frac)
     out.T_sun[j] += Tcan[c.SUNLIT]
     out.T_sha[j] += Tcan[c.SHADED]
@@ -86,21 +82,8 @@ def update_output_hourly(i, j, An, et, Tcan, apar, lai_leaf, df, footprint, out)
     out.LAI_sha[j] += lai_leaf[c.SHADED]
 
     # Convert from per tree to m-2
-    out.An_obs[j] += df.FluxCO2[i] * c.MMOL_2_UMOL * an_conv / footprint
-    out.E_obs[j] += df.FluxH2O[i] * et_conv / footprint
-
-    return out
-
-def update_output_daily(j, year, doy, out):
-
-    out.year[j] = year
-    out.doy[j] = doy
-    out.T_can[j] /= 24.
-    out.T_sun[j] /= 24.
-    out.T_sha[j] /= 24.
-    out.LAI_can[j] /= 24.
-    out.LAI_sun[j] /= 24.
-    out.LAI_sha[j] /= 24.
+    out.An_obs[j] = df.FluxCO2[j] * c.MMOL_2_UMOL / footprint
+    out.E_obs[j] = df.FluxH2O[j] / footprint
 
     return out
 
@@ -126,7 +109,6 @@ if __name__ == "__main__":
     T = TwoLeaf(p, gs_model="medlyn")
 
     chambers = np.unique(df.chamber)
-    chambers = ["C01"]
     for chamber in chambers:
         print(chamber)
         dfx = df[(df.T_treatment == "ambient") &
