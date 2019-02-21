@@ -14,6 +14,7 @@ import constants as c
 import parameters as p
 from radiation import calculate_absorbed_radiation
 from two_leaf import Canopy as TwoLeaf
+#from big_leaf import Canopy as BigLeaf
 
 __author__  = "Martin De Kauwe"
 __version__ = "1.0 (07.12.2018)"
@@ -36,6 +37,8 @@ def run_treatment(T, df, p, wind, pressure, Ca):
         doy = df.doy[i]
         hod = df.hod[i]
 
+        #(An, gsw, et, Tcan) = T.main(p, df.tair[i]], df.par[i], df.vpd[i], wind,
+        #                             pressure, Ca, doy, hod, df.lai[i])
         (An, et, Tcan,
          apar, lai_leaf) = T.main(p, df.tair[i], df.par[i], df.vpd[i], wind,
                                   pressure, Ca, doy, hod, df.lai[i],
@@ -108,6 +111,7 @@ if __name__ == "__main__":
     Ca = 400.0
 
     T = TwoLeaf(p, gs_model="medlyn")
+    #T = BigLeaf(p, gs_model="medlyn")
 
     chambers = np.unique(df.chamber)
     for chamber in chambers:
