@@ -38,7 +38,8 @@ def run_treatment(T, df, p, wind, pressure, Ca):
 
         (An, et, Tcan,
          apar, lai_leaf) = T.main(p, df.tair[i], df.par[i], df.vpd[i], wind,
-                                  pressure, Ca, doy, hod, df.lai[i])
+                                  pressure, Ca, doy, hod, df.lai[i],
+                                  vary_vcmax=None, vary_jmax=None)
         out = update_output_hourly(doy, i, An, et, Tcan, apar, lai_leaf, df,
                                    p.footprint, out)
 
