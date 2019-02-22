@@ -74,8 +74,8 @@ class FarquharC3(object):
         self.adjust_for_low_temp = adjust_for_low_temp
 
     def photosynthesis(self, p, Cs=None, Tleaf=None, Par=None, vpd=None,
-                       mult=None, scalex=None, vary_vcmax=None,
-                       vary_jmax=None):
+                       mult=None, scalex=None, Vcmax25=None,
+                       Jmax25=None):
         """
         Parameters
         ----------
@@ -107,13 +107,6 @@ class FarquharC3(object):
 
         # Effect of temp on CO2 compensation point
         gamma_star = self.arrh(p.gamstar25, p.Eag, Tleaf)
-
-        if vary_vcmax is None and vary_jmax is None:
-            Vcmax25 = p.Vcmax25
-            Jmax25 = p.Jmax25
-        else:
-            Vcmax25 = varying_vcmax[idx]
-            Jmax25 = varying_jmax[idx]
 
         # Calculate temperature dependancies on Vcmax and Jmax
         if self.peaked_Vcmax:

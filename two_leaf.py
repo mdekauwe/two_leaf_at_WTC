@@ -47,7 +47,7 @@ class Canopy(object):
 
 
     def main(self, tair, par, vpd, wind, pressure, Ca, doy, hod,
-             lai, rnet=None, vary_vcmax=None, vary_jmax=None):
+             lai, rnet=None, Vcmax25=None, Jmax25=None):
         """
         Parameters:
         ----------
@@ -142,8 +142,8 @@ class Canopy(object):
                                                         Par=apar[ileaf],
                                                         vpd=dleaf,
                                                         scalex=scalex[ileaf],
-                                                        vary_vcmax=vary_vcmax,
-                                                        vary_jmax=vary_jmax)
+                                                        Vcmax25=Vcmax25,
+                                                        Jmax25=Jmax25)
                     else:
                         An[ileaf], gsc[ileaf] = 0., 0.
 
