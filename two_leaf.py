@@ -46,7 +46,7 @@ class Canopy(object):
         self.iter_max = iter_max
 
 
-    def main(self, p, tair, par, vpd, wind, pressure, Ca, doy, hod,
+    def main(self, tair, par, vpd, wind, pressure, Ca, doy, hod,
              lai, rnet=None, vary_vcmax=None, vary_jmax=None):
         """
         Parameters:
@@ -98,7 +98,7 @@ class Canopy(object):
         sw_rad = np.zeros(2) # VIS, NIR
         tcanopy = np.zeros(2)
 
-        (cos_zenith, elevation) = calculate_cos_zenith(doy, p.lat, hod)
+        (cos_zenith, elevation) = calculate_cos_zenith(doy, self.p.lat, hod)
 
         sw_rad[c.VIS] = 0.5 * (par * c.PAR_2_SW) # W m-2
         sw_rad[c.NIR] = 0.5 * (par * c.PAR_2_SW) # W m-2
@@ -107,13 +107,14 @@ class Canopy(object):
         (diffuse_frac, direct_frac) = spitters(doy, sw_rad[0], cos_zenith)
 
         (qcan, apar,
-         lai_leaf, kb) = calculate_absorbed_radiation(p, par, cos_zenith, lai,
-                                                      direct_frac, diffuse_frac,
-                                                      doy, sw_rad, tair)
+         lai_leaf, kb) = calculate_absorbed_radiation(self.p, par, cos_zenith,
+                                                      lai, direct_frac,
+                                                      diffuse_frac, doy, sw_rad,
+                                                      tair)
 
         # Calculate scaling term to go from a single leaf to canopy,
         # see Wang & Leuning 1998 appendix C
-        scalex = calc_leaf_to_canopy_scalar(lai, kb=kb, kn=p.kn)
+        scalex = calc_leaf_to_canopy_scalar(lai, kb=kb, kn=self.p.kn)
 
         if lai_leaf[0] < 1.e-3: # to match line 336 of CABLE radiation
             scalex[0] = 0.
@@ -136,7 +137,7 @@ class Canopy(object):
 
                     if scalex[ileaf] > 0.:
                         (An[ileaf],
-                         gsc[ileaf]) = F.photosynthesis(p, Cs=Cs,
+                         gsc[ileaf]) = F.photosynthesis(self.p, Cs=Cs,
                                                         Tleaf=Tleaf_K,
                                                         Par=apar[ileaf],
                                                         vpd=dleaf,
@@ -148,8 +149,8 @@ class Canopy(object):
 
                     # Calculate new Tleaf, dleaf, Cs
                     (new_tleaf, et[ileaf],
-                     le_et, gbH, gw) = self.calc_leaf_temp(p, PM, Tleaf, tair,
-                                                           gsc[ileaf],
+                     le_et, gbH, gw) = self.calc_leaf_temp(self.p, PM, Tleaf,
+                                                           tair, gsc[ileaf],
                                                            None, vpd,
                                                            pressure, wind,
                                                            rnet=qcan[ileaf],
