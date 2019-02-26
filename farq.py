@@ -112,7 +112,7 @@ class FarquharC3(object):
         if self.peaked_Vcmax:
             Vcmax = self.peaked_arrh(Vcmax25, p.Eav, Tleaf, p.deltaSv, p.Hdv)
         else:
-            Vcmax = self.arrh(Vcmax25, Eav, Tleaf)
+            Vcmax = self.arrh(Vcmax25, p.Eav, Tleaf)
 
         if self.peaked_Jmax:
             Jmax = self.peaked_arrh(Jmax25, p.Eaj, Tleaf, p.deltaSj, p.Hdj)

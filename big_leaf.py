@@ -40,7 +40,7 @@ class Canopy(object):
         self.iter_max = iter_max
 
     def main(self, tair, par, vpd, wind, pressure, Ca, doy, hod,
-             lai, rnet=None):
+             lai, rnet=None, Vcmax25=None, Jmax25=None):
         """
         Parameters:
         ----------
@@ -104,7 +104,9 @@ class Canopy(object):
             	# Eqn 4, Haxeltine & Prentice 1996a
                 apar = par * fpar
                 (An, gsc) = F.photosynthesis(self.p, Cs=Cs, Tleaf=Tleaf_K,
-                                             Par=apar, vpd=dleaf)
+                                             Par=apar, vpd=dleaf,
+                                             Vcmax25=Vcmax25,
+                                             Jmax25=Jmax25)
 
                 # Calculate new Tleaf, dleaf, Cs
                 (new_tleaf, et,

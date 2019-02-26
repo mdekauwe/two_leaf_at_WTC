@@ -20,7 +20,7 @@ __version__ = "1.0 (07.12.2018)"
 __email__   = "mdekauwe@gmail.com"
 
 
-def run_treatment(B, df, p, wind, pressure, Ca):
+def run_treatment(B, df, p, wind, pressure, Ca, vary_vj=False):
 
     days = df.doy
     hod = df.hod
@@ -36,8 +36,15 @@ def run_treatment(B, df, p, wind, pressure, Ca):
         doy = df.doy[i]
         hod = df.hod[i]
 
-        (An, gsw, et, Tcan) = B.main(df.tair[i], df.par[i], df.vpd[i], wind,
-                                     pressure, Ca, doy, hod, df.lai[i])
+        if vary_vj:
+            (An, gsw, et, Tcan) = B.main(df.tair[i], df.par[i], df.vpd[i], wind,
+                                         pressure, Ca, doy, hod, df.lai[i],
+                                         Vcmax25=df.Vcmax25[i],
+                                         Jmax25=df.Jmax25[i])
+        else:
+            (An, gsw, et, Tcan) = B.main(df.tair[i], df.par[i], df.vpd[i], wind,
+                                         pressure, Ca, doy, hod, df.lai[i],
+                                         Vcmax25=p.Vcmax25, Jmax25=p.Jmax25)
 
         out = update_output_hourly(doy, i, An, et, Tcan, df, p.footprint, out)
 
@@ -94,7 +101,7 @@ if __name__ == "__main__":
                  (df.Water_treatment == "control") &
                  (df.chamber == chamber)].copy()
 
-        (out) = run_treatment(B, dfx, p, wind, pressure, Ca)
+        (out) = run_treatment(B, dfx, p, wind, pressure, Ca, vary_vj=True)
 
         if not os.path.exists(output_dir):
             os.mkdir(output_dir)
