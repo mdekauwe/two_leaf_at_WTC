@@ -42,7 +42,7 @@ def plot_all_chambers(output_dir):
         ax = fig.add_subplot(2,3,1+i)
 
         #ax.plot(df_2l.T_can, df_2l.An_can, ".", label="2-leaf")
-        #ax.plot(df_bl.T_can, df_bl.An_can, ".", label="Big leaf")
+        ax.plot(df_bl.T_can, df_bl.An_can, ".", label="Big leaf")
         ax.plot(df_2l.T_can, df_2l.An_can, ".", label="2-leaf")
         ax.plot(df_2l.T_sun, df_2l.An_sun, ".", label="Sun")
         ax.plot(df_2l.T_sha, df_2l.An_sha, ".", label="Shade")
@@ -152,5 +152,5 @@ if __name__ == "__main__":
     chambers = ["C01", "C03", "C05", "C07", "C09", "C11"]
 
     plot_all_chambers(output_dir)
-    plot_all_chambers_day(output_dir)
-    plot_one_chamber(output_dir, chambers[0])
+    #plot_all_chambers_day(output_dir)
+    #plot_one_chamber(output_dir, chambers[0])
