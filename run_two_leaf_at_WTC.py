@@ -74,21 +74,21 @@ def update_output_hourly(doy, j, An, et, Tcan, apar, lai_leaf, df, footprint,
     #et_conv = c.MOL_WATER_2_G_WATER * c.G_TO_KG * c.SEC_TO_HR
     sun_frac = lai_leaf[c.SUNLIT] / np.sum(lai_leaf)
     sha_frac = lai_leaf[c.SHADED] / np.sum(lai_leaf)
-    out.An_can[j] += np.sum(An)
-    out.An_sun[j] += An[c.SUNLIT]
-    out.An_sha[j] += An[c.SHADED]
-    out.E_can[j] += np.sum(et)
-    out.E_sun[j] += et[c.SUNLIT]
-    out.E_sha[j] += et[c.SHADED]
-    out.T_can[j] += (Tcan[c.SUNLIT] * sun_frac) + (Tcan[c.SHADED] * sha_frac)
-    out.T_sun[j] += Tcan[c.SUNLIT]
-    out.T_sha[j] += Tcan[c.SHADED]
-    out.APAR_can[j] += np.sum(apar)
-    out.APAR_sun[j] += apar[c.SUNLIT]
-    out.APAR_sha[j] += apar[c.SHADED]
-    out.LAI_can[j] += np.sum(lai_leaf)
-    out.LAI_sun[j] += lai_leaf[c.SUNLIT]
-    out.LAI_sha[j] += lai_leaf[c.SHADED]
+    out.An_can[j] = np.sum(An)
+    out.An_sun[j] = An[c.SUNLIT]
+    out.An_sha[j] = An[c.SHADED]
+    out.E_can[j] = np.sum(et)
+    out.E_sun[j] = et[c.SUNLIT]
+    out.E_sha[j] = et[c.SHADED]
+    out.T_can[j] = (Tcan[c.SUNLIT] * sun_frac) + (Tcan[c.SHADED] * sha_frac)
+    out.T_sun[j] = Tcan[c.SUNLIT]
+    out.T_sha[j] = Tcan[c.SHADED]
+    out.APAR_can[j] = np.sum(apar)
+    out.APAR_sun[j] = apar[c.SUNLIT]
+    out.APAR_sha[j] = apar[c.SHADED]
+    out.LAI_can[j] = np.sum(lai_leaf)
+    out.LAI_sun[j] = lai_leaf[c.SUNLIT]
+    out.LAI_sha[j] = lai_leaf[c.SHADED]
 
     # Convert from per tree to m-2
     out.An_obs[j] = df.FluxCO2[j] * c.MMOL_2_UMOL / footprint
@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
     output_dir = "outputs"
     fpath = "/Users/mdekauwe/Downloads/"
-    fname = "met_data_gap_fixed.csv"
+    fname = "met_data_gap_fixed_V1.csv"
     fn = os.path.join(fpath, fname)
     df = pd.read_csv(fn)
     #df = df.drop(df.columns[0], axis=1)
@@ -133,4 +133,3 @@ if __name__ == "__main__":
         if os.path.isfile(ofname):
             os.remove(ofname)
         out.to_csv(ofname, index=False)
-        

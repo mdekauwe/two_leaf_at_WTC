@@ -63,9 +63,9 @@ def setup_output_dataframe(ndays):
 
 def update_output_hourly(doy, j, An, et, Tcan, df, footprint, out):
 
-    out.An_can[j] += np.sum(An)
-    out.E_can[j] += np.sum(et)
-    out.T_can[j] += Tcan
+    out.An_can[j] = np.sum(An)
+    out.E_can[j] = np.sum(et)
+    out.T_can[j] = Tcan
 
     # Convert from per tree to m-2
     out.An_obs[j] = df.FluxCO2[j] * c.MMOL_2_UMOL / footprint
@@ -77,7 +77,7 @@ if __name__ == "__main__":
 
     output_dir = "outputs"
     fpath = "/Users/mdekauwe/Downloads/"
-    fname = "met_data_gap_fixed.csv"
+    fname = "met_data_gap_fixed_V1.csv"
     fn = os.path.join(fpath, fname)
     df = pd.read_csv(fn)
     #df = df.drop(df.columns[0], axis=1)
@@ -101,12 +101,12 @@ if __name__ == "__main__":
                  (df.Water_treatment == "control") &
                  (df.chamber == chamber)].copy()
 
-        (out) = run_treatment(B, dfx, p, wind, pressure, Ca, vary_vj=True)
+        (out) = run_treatment(B, dfx, p, wind, pressure, Ca, vary_vj=False)
 
         if not os.path.exists(output_dir):
             os.mkdir(output_dir)
 
-        ofname = os.path.join(output_dir, "wtc_two_leaf_%s.csv" % (chamber))
+        ofname = os.path.join(output_dir, "wtc_big_leaf_%s.csv" % (chamber))
         if os.path.isfile(ofname):
             os.remove(ofname)
         out.to_csv(ofname, index=False)
