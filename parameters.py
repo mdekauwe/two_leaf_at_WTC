@@ -48,16 +48,18 @@ theta_hyperbol = 0.9995
 # set to MAESTRA numbers
 theta_J = 0.57
 
+# Quantum yield of electron transport per absorbed photon [mol mol-1]
 quantum_yield = 0.3
 
 absorptance = 1 - refl[0] - tau[0]
 
 # Leaf quantum yield (initial slope of the A-light response curve) [mol mol-1]
-# this value (0.246) is slightly lower than MAESTRA (0.26)
-# reflectance and transmittance should change to MAESTRA
-
-#alpha = quantum_yield * absorptance # (Medlyn et al 2002)
-alpha = 0.26
+# Both models pass *absorbed* PAR to the electron transport calculation (the
+# two-leaf qcan already accounts for leaf reflectance & transmittance), so
+# alpha must be on an absorbed basis. The incident-basis value would be
+# quantum_yield * absorptance (0.24, Medlyn et al 2002); using it with
+# absorbed PAR counts the leaf absorptance twice. Previously 0.26 (MAESTRA).
+alpha = quantum_yield
 # residual stomatal conductance as net assimilation rate reaches zero
 # (mol m-2 s-1)
 g0 = 0.0
