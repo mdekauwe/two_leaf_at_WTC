@@ -5,9 +5,6 @@ Plot the A as a function of Tcan
 
 """
 import os
-import sys
-import numpy as np
-import math
 import pandas as pd
 
 import matplotlib.pyplot as plt
@@ -16,11 +13,7 @@ __author__  = "Martin De Kauwe"
 __version__ = "1.0 (30.04.2019)"
 __email__   = "mdekauwe@gmail.com"
 
-def plot_all_chambers(output_dir):
-
-    fig = plt.figure(figsize=(9,6))
-    fig.subplots_adjust(hspace=0.1)
-    fig.subplots_adjust(wspace=0.05)
+def set_style():
     plt.rcParams['text.usetex'] = False
     plt.rcParams['font.family'] = "sans-serif"
     plt.rcParams['font.sans-serif'] = "Helvetica"
@@ -30,8 +23,31 @@ def plot_all_chambers(output_dir):
     plt.rcParams['xtick.labelsize'] = 14
     plt.rcParams['ytick.labelsize'] = 14
 
-    for i, chamber in enumerate(chambers):
+def label_panel(ax, i, ylabel):
 
+    if i == 4:
+        ax.set_xlabel(r"T$_{canopy}$ ($^{\circ}\mathrm{C}$)")
+
+    if i == 0:
+        ax.legend(numpoints=1, loc="best")
+
+    if i < 3:
+        plt.setp(ax.get_xticklabels(), visible=False)
+
+    if i != 0 and i != 3:
+        plt.setp(ax.get_yticklabels(), visible=False)
+
+    if i == 3:
+        ax.set_ylabel(ylabel, position=(1.0, 1.2))
+
+def plot_all_chambers(output_dir, chambers):
+
+    set_style()
+    fig = plt.figure(figsize=(9,6))
+    fig.subplots_adjust(hspace=0.1)
+    fig.subplots_adjust(wspace=0.05)
+
+    for i, chamber in enumerate(chambers):
 
         fn = os.path.join(output_dir, "wtc_two_leaf_%s.csv" % (chamber))
         df_2l = pd.read_csv(fn)
@@ -41,47 +57,23 @@ def plot_all_chambers(output_dir):
 
         ax = fig.add_subplot(2,3,1+i)
 
-        #ax.plot(df_2l.T_can, df_2l.An_can, ".", label="2-leaf")
         ax.plot(df_bl.T_can, df_bl.An_can, ".", label="Big leaf")
         ax.plot(df_2l.T_can, df_2l.An_can, ".", label="2-leaf")
         ax.plot(df_2l.T_sun, df_2l.An_sun, ".", label="Sun")
         ax.plot(df_2l.T_sha, df_2l.An_sha, ".", label="Shade")
 
-
-        if i == 4:
-            ax.set_xlabel("T$_{canopy}$ ($^{\circ}\mathrm{C}$)")
-
-        if i == 0:
-            ax.legend(numpoints=1, loc="best")
-
-        if i < 3:
-            plt.setp(ax.get_xticklabels(), visible=False)
-
-        if i != 0 and i != 3:
-            plt.setp(ax.get_yticklabels(), visible=False)
-
-        if i == 3:
-            ax.set_ylabel("An (\u03BCmol m$^{-2}$ s$^{-1}$)",
-                          position=(1.0, 1.2))
+        label_panel(ax, i, "An (μmol m$^{-2}$ s$^{-1}$)")
 
     plt.show()
 
-def plot_all_chambers_day(output_dir):
+def plot_all_chambers_day(output_dir, chambers):
 
+    set_style()
     fig = plt.figure(figsize=(9,6))
     fig.subplots_adjust(hspace=0.1)
     fig.subplots_adjust(wspace=0.05)
-    plt.rcParams['text.usetex'] = False
-    plt.rcParams['font.family'] = "sans-serif"
-    plt.rcParams['font.sans-serif'] = "Helvetica"
-    plt.rcParams['axes.labelsize'] = 14
-    plt.rcParams['font.size'] = 14
-    plt.rcParams['legend.fontsize'] = 14
-    plt.rcParams['xtick.labelsize'] = 14
-    plt.rcParams['ytick.labelsize'] = 14
 
     for i, chamber in enumerate(chambers):
-
 
         fn = os.path.join(output_dir, "wtc_two_leaf_day_%s.csv" % (chamber))
         df_2l = pd.read_csv(fn)
@@ -90,22 +82,7 @@ def plot_all_chambers_day(output_dir):
 
         ax.plot(df_2l.T_can, df_2l.An_can, ".", label="2-leaf")
 
-
-        if i == 4:
-            ax.set_xlabel("T$_{canopy}$ ($^{\circ}\mathrm{C}$)")
-
-        if i == 0:
-            ax.legend(numpoints=1, loc="best")
-
-        if i < 3:
-            plt.setp(ax.get_xticklabels(), visible=False)
-
-        if i != 0 and i != 3:
-            plt.setp(ax.get_yticklabels(), visible=False)
-
-        if i == 3:
-            ax.set_ylabel("An (g C m$^{-2}$ d$^{-1}$)",
-                          position=(1.0, 1.2))
+        label_panel(ax, i, "An (g C m$^{-2}$ d$^{-1}$)")
 
     plt.show()
 
@@ -117,17 +94,8 @@ def plot_one_chamber(output_dir, chamber):
     fn = os.path.join(output_dir, "wtc_big_leaf_%s.csv" % (chamber))
     df_bl = pd.read_csv(fn)
 
+    set_style()
     fig = plt.figure(figsize=(9,6))
-    fig.subplots_adjust(hspace=0.1)
-    fig.subplots_adjust(wspace=0.05)
-    plt.rcParams['text.usetex'] = False
-    plt.rcParams['font.family'] = "sans-serif"
-    plt.rcParams['font.sans-serif'] = "Helvetica"
-    plt.rcParams['axes.labelsize'] = 14
-    plt.rcParams['font.size'] = 14
-    plt.rcParams['legend.fontsize'] = 14
-    plt.rcParams['xtick.labelsize'] = 14
-    plt.rcParams['ytick.labelsize'] = 14
 
     ax = fig.add_subplot(111)
     ax.plot(df_bl.T_can, df_bl.An_can, ".", label="Big leaf")
@@ -135,15 +103,11 @@ def plot_one_chamber(output_dir, chamber):
     ax.plot(df_2l.T_sun, df_2l.An_sun, ".", label="Sun")
     ax.plot(df_2l.T_sha, df_2l.An_sha, ".", label="Shade")
 
-
-
-    ax.set_xlabel("T$_{canopy}$ ($^{\circ}\mathrm{C}$)")
+    ax.set_xlabel(r"T$_{canopy}$ ($^{\circ}\mathrm{C}$)")
     ax.legend(numpoints=1, loc="best")
-    ax.set_ylabel("An (\u03BCmol m$^{-2}$s$^{-1}$)")
+    ax.set_ylabel("An (μmol m$^{-2}$s$^{-1}$)")
 
     plt.show()
-
-
 
 
 if __name__ == "__main__":
@@ -151,6 +115,6 @@ if __name__ == "__main__":
     output_dir = "outputs"
     chambers = ["C01", "C03", "C05", "C07", "C09", "C11"]
 
-    plot_all_chambers(output_dir)
-    #plot_all_chambers_day(output_dir)
+    plot_all_chambers(output_dir, chambers)
+    #plot_all_chambers_day(output_dir, chambers)
     #plot_one_chamber(output_dir, chambers[0])

@@ -10,9 +10,7 @@ __author__ = "Martin De Kauwe"
 __version__ = "1.0 (13.08.2012)"
 __email__ = "mdekauwe@gmail.com"
 
-import sys
 import numpy as np
-import os
 import math
 import constants as c
 
@@ -169,7 +167,7 @@ class FarquharC3(object):
             g0 = p.g0 / c.GSC_2_GSW
             gs_over_a = mult / c.GSC_2_GSW
 
-        if ( np.isclose(Par, 0.0) | np.isclose(Vj, 0.0) ):
+        if np.isclose(Par, 0.0) or np.isclose(Vj, 0.0):
             Cic = Cs
             Cij = Cs
         else:
@@ -200,19 +198,9 @@ class FarquharC3(object):
         # Calculate conductance to CO2
         gsc = max(g0, g0 + gs_over_a * An)
 
-        # Calculate conductance to water
-        gsw = gsc * c.GSC_2_GSW
-
-        # calculate the real Ci
-        if gsc > 0.0 and An > 0.0:
-            Ci = Cs - An / gsc
-        else:
-            Ci = Cs
-
         if np.isclose(Cs, 0.0):
             An = 0.0 - Rd
             gsc = 0.0
-            Ci = Cs
 
         return (An, gsc)
 
@@ -245,8 +233,8 @@ class FarquharC3(object):
           18, 1183– 1200, 1995. Leuning 1995, eqn C3.
         """
         A = p.theta_J
-        B = -(p.alpha * Par + Jmax);
-        C = p.alpha * Par * Jmax;
+        B = -(p.alpha * Par + Jmax)
+        C = p.alpha * Par * Jmax
 
         J = self.quadratic(a=A, b=B, c=C, large=False)
 
@@ -492,7 +480,7 @@ class FarquharC3(object):
             if np.isclose(a, 0.0) and b > 0.0:
                 root = -c / b
             elif np.isclose(a, 0.0) and np.isclose(b, 0.0):
-                root == 0.0
+                root = 0.0
                 if c != 0.0:
                     raise ValueError('Cant solve quadratic')
             else:

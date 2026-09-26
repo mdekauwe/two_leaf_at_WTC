@@ -1,23 +1,18 @@
 #!/usr/bin/env python
 """
-Solve 30-minute coupled A-gs(E) using a big-leaf approximation, i.e. simply
-multiplying leaf-level fluxes by LAI.
+Solve 30-minute coupled A-gs(E) using a big-leaf approximation, i.e. a single
+leaf whose Vcmax, Jmax and Rd are scaled to the canopy assuming capacity
+declines through the canopy in proportion to the light (Beer's law).
 """
 
-import sys
-import numpy as np
-import matplotlib.pyplot as plt
-from math import pi, cos, sin, exp, sqrt, acos, asin
-import random
 import math
 import numpy as np
 
 import constants as c
-import parameters as p
 from farq import FarquharC3
-from penman_monteith_leaf import PenmanMonteith
+from penman_monteith_leaf import PenmanMonteith, calc_leaf_temp
 from radiation import calculate_cos_zenith, calc_leaf_to_canopy_scalar
-from utils import calc_esat
+from radiation import calc_kd, calc_conductance_scalars
 
 __author__  = "Martin De Kauwe"
 __version__ = "1.0 (09.11.2018)"
@@ -32,15 +27,13 @@ class Canopy(object):
                  gs_model=None, iter_max=100):
 
         self.p = p
-
-        self.peaked_Jmax = peaked_Jmax
-        self.peaked_Vcmax = peaked_Vcmax
-        self.model_Q10 = model_Q10
-        self.gs_model = gs_model
         self.iter_max = iter_max
+        self.F = FarquharC3(peaked_Jmax=peaked_Jmax, peaked_Vcmax=peaked_Vcmax,
+                            model_Q10=model_Q10, gs_model=gs_model)
+        self.PM = PenmanMonteith()
 
-    def main(self, tair, par, vpd, wind, pressure, Ca, doy, hod,
-             lai, rnet=None, Vcmax25=None, Jmax25=None):
+    def main(self, tair, par, vpd, wind, pressure, Ca, doy, hod, lai,
+             rnet=None, Vcmax25=None, Jmax25=None):
         """
         Parameters:
         ----------
@@ -49,8 +42,7 @@ class Canopy(object):
         par : float
             Photosynthetically active radiation (umol m-2 s-1)
         vpd : float
-            Vapour pressure deficit (kPa, needs to be in Pa, see conversion
-            below)
+            Vapour pressure deficit (kPa)
         wind : float
             wind speed (m s-1)
         pressure : float
@@ -58,61 +50,75 @@ class Canopy(object):
         Ca : float
             ambient CO2 concentration
         doy : float
-            day of day
+            day of year
         hod : float
             hour of day
-        lat : float
-            latitude
-        lon : float
-            longitude
-        lai : floar
+        lai : float
             leaf area index
+        rnet : float
+            isothermal net radiation (W m-2); estimated from PAR if None
 
         Returns:
         --------
-        An : float
-            net leaf assimilation (umol m-2 s-1)
-        gs : float
-            stomatal conductance (mol m-2 s-1)
-        et : float
+        an_canopy : float
+            net canopy assimilation (umol m-2 s-1)
+        gsw_canopy : float
+            canopy stomatal conductance to water (mol m-2 s-1)
+        et_canopy : float
             transpiration (mol H2O m-2 s-1)
+        tcanopy : float
+            canopy temperature (deg C)
         """
-
-        F = FarquharC3(peaked_Jmax=self.peaked_Jmax,
-                       peaked_Vcmax=self.peaked_Vcmax,
-                       model_Q10=self.model_Q10, gs_model=self.gs_model)
-        PM = PenmanMonteith()
+        p = self.p
+        if Vcmax25 is None:
+            Vcmax25 = p.Vcmax25
+        if Jmax25 is None:
+            Jmax25 = p.Jmax25
 
         # set initial values
         dleaf = vpd
         Cs = Ca
         Tleaf = tair
-        Tleaf_K = Tleaf + c.DEG_2_KELVIN
 
-        (cos_zenith, elevation) = calculate_cos_zenith(doy, self.p.lat, hod)
+        (cos_zenith, elevation) = calculate_cos_zenith(doy, p.lat, hod)
 
         # Calculate big-leaf scaling term to go from a single leaf to canopy
-        fpar = calc_leaf_to_canopy_scalar(lai, k=self.p.k, big_leaf=True)
+        scalex = calc_leaf_to_canopy_scalar(lai, k=p.k, big_leaf=True)
+
+        # Fraction of radiation absorbed by the canopy (Beer's law)
+        fabs = 1.0 - np.exp(-p.k * lai)
+
+        # PAR absorbed by the canopy (umol m-2 ground s-1). Together with
+        # Vcmax, Jmax & Rd scaled by scalex this gives canopy-scale An & gsc,
+        # consistent with the canopy-scale rnet used in the energy balance.
+        apar = par * fabs
+
+        # Scale boundary layer & radiative conductances from a single leaf to
+        # the canopy, to match rnet and gsc
+        (kd, _) = calc_kd(p, lai)
+        scalars = calc_conductance_scalars(lai, p.wind_extinction, kd)
+
+        if rnet is None:
+            # isothermal rnet for a closed canopy, reduced for sparse canopies
+            tair_k = tair + c.DEG_2_KELVIN
+            rnet = self.PM.calc_rnet(p, par, tair, tair_k, vpd) * fabs
 
         # Is the sun up?
         if elevation > 0.0 and par > 50.0:
 
-            iter = 0
-            while True:
-                # Scale fractional PAR absorption at plant projective area level
-            	# (FPAR) to fractional absorption at leaf level (APAR)
-            	# Eqn 4, Haxeltine & Prentice 1996a
-                apar = par * fpar
-                (An, gsc) = F.photosynthesis(self.p, Cs=Cs, Tleaf=Tleaf_K,
-                                             Par=apar, vpd=dleaf,
-                                             Vcmax25=Vcmax25,
-                                             Jmax25=Jmax25)
+            for _ in range(self.iter_max + 1):
+                Tleaf_K = Tleaf + c.DEG_2_KELVIN
+                (An, gsc) = self.F.photosynthesis(p, Cs=Cs, Tleaf=Tleaf_K,
+                                                  Par=apar, vpd=dleaf,
+                                                  scalex=scalex,
+                                                  Vcmax25=Vcmax25,
+                                                  Jmax25=Jmax25)
 
                 # Calculate new Tleaf, dleaf, Cs
                 (new_tleaf, et,
-                 le_et, gbH, gw) = self.calc_leaf_temp(self.p, PM, Tleaf, tair,
-                                                       gsc, par, vpd, pressure,
-                                                       wind, rnet=rnet)
+                 le_et, gbH, gw) = calc_leaf_temp(p, self.PM, Tleaf, tair,
+                                                  gsc, vpd, pressure, wind,
+                                                  rnet=rnet, scalars=scalars)
 
                 gbc = gbH * c.GBH_2_GBC
                 if gbc > 0.0 and An > 0.0:
@@ -125,22 +131,18 @@ class Canopy(object):
                 else:
                     dleaf = (et * pressure / gw) * c.PA_2_KPA # kPa
 
-                # Check for convergence...?
-                if math.fabs(Tleaf - new_tleaf) < 0.02:
-                    break
-
-                if iter > self.iter_max:
-                    #raise Exception('No convergence: %d' % (iter))
-                    An = 0.0
-                    gsc = 0.0
-                    et = 0.0
-                    break
+                converged = math.fabs(Tleaf - new_tleaf) < 0.02
 
                 # Update temperature & do another iteration
                 Tleaf = new_tleaf
-                Tleaf_K = Tleaf + c.DEG_2_KELVIN
 
-                iter += 1
+                if converged:
+                    break
+            else:
+                # No convergence
+                An = 0.0
+                gsc = 0.0
+                et = 0.0
 
             an_canopy = An
             gsw_canopy = gsc * c.GSC_2_GSW
@@ -153,169 +155,3 @@ class Canopy(object):
             tcanopy = tair
 
         return (an_canopy, gsw_canopy, et_canopy, tcanopy)
-
-    def calc_leaf_temp(self, p, PM=None, tleaf=None, tair=None, gsc=None,
-                       par=None, vpd=None, pressure=None, wind=None, rnet=None):
-        """
-        Resolve leaf temp
-
-        Parameters:
-        ----------
-        P : object
-            Penman-Montheith class instance
-        tleaf : float
-            leaf temperature (deg C)
-        tair : float
-            air temperature (deg C)
-        gs : float
-            stomatal conductance (mol m-2 s-1)
-        par : float
-            Photosynthetically active radiation (umol m-2 s-1)
-        vpd : float
-            Vapour pressure deficit (kPa, needs to be in Pa, see conversion
-            below)
-        pressure : float
-            air pressure (using constant) (Pa)
-        wind : float
-            wind speed (m s-1)
-
-        Returns:
-        --------
-        new_Tleaf : float
-            new leaf temperature (deg C)
-        et : float
-            transpiration (mol H2O m-2 s-1)
-        gbH : float
-            total boundary layer conductance to heat for one side of the leaf
-        gw : float
-            total leaf conductance to water vapour (mol m-2 s-1)
-        """
-        tleaf_k = tleaf + c.DEG_2_KELVIN
-        tair_k = tair + c.DEG_2_KELVIN
-
-        air_density = pressure / (c.RSPECIFC_DRY_AIR * tair_k)
-
-        # convert from mm s-1 to mol m-2 s-1
-        cmolar = pressure / (c.RGAS * tair_k)
-
-        # W m-2 = J m-2 s-1
-        if rnet is None:
-            rnet = PM.calc_rnet(par, tair, tair_k, tleaf_k, vpd, pressure)
-
-        (grn, gh, gbH, gw) = PM.calc_conductances(p, tair_k, tleaf, tair,
-                                                  wind, gsc, cmolar)
-        if np.isclose(gsc, 0.0):
-            et = 0.0
-            le_et = 0.0
-        else:
-            (et, le_et) = PM.calc_et(tleaf, tair, vpd, pressure, wind, par,
-                                    gh, gw, rnet)
-
-        # D6 in Leuning. NB I'm doubling conductances, see note below E5.
-        # Leuning isn't explicit about grn but I think this is right
-        # NB the units or grn and gbH are mol m-2 s-1 and not m s-1, but it
-        # cancels.
-        Y = 1.0 / (1.0 + (2.0 * grn) / (2.0 * gbH))
-
-        # sensible heat exchanged between leaf and surroundings
-        H = Y * (rnet - le_et)
-
-        # leaf-air temperature difference recalculated from energy balance.
-        # NB. I'm using gh here to include grn and the doubling of conductances
-        new_Tleaf = tair + H / (c.CP * air_density * (gh / cmolar))
-
-        return (new_Tleaf, et, le_et, gbH, gw)
-
-
-if __name__ == "__main__":
-
-    from get_days_met_forcing import get_met_data
-
-    doy = 180.
-    #
-    ## Met data ...
-    #
-    (par, tair, vpd) = get_met_data(p.lat, p.lon, doy)
-
-    # more realistic VPD
-    rh = 40.
-    esat = calc_esat(tair)
-    ea = rh / 100. * esat
-    vpd = (esat - ea) * c.PA_2_KPA
-    vpd = np.where(vpd < 0.05, 0.05, vpd)
-
-    #
-    ##  Fixed met stuff
-    #
-    wind = 2.5
-    pressure = 101325.0
-    Ca = 400.0
-    lai = p.LAI
-
-    ##
-    ### Run Big-leaf
-    ##
-    B = Canopy(p, gs_model="medlyn")
-
-    An_bl = np.zeros(48)
-    gsw_bl = np.zeros(48)
-    et_bl = np.zeros(48)
-    tcan_bl = np.zeros(48)
-
-    for i in range(len(par)):
-
-        hod = float(i)/2. + 1800. / 3600. / 2.
-
-        (An, gsw, et, Tcan) = B.main(tair[i], par[i], vpd[i], wind,
-                                     pressure, Ca, doy, hod, lai)
-
-        An_bl[i] = An
-        et_bl[i] = et
-        tcan_bl[i] = Tcan
-
-
-    fig = plt.figure(figsize=(16,4))
-    fig.subplots_adjust(hspace=0.1)
-    fig.subplots_adjust(wspace=0.2)
-    plt.rcParams['text.usetex'] = False
-    plt.rcParams['font.family'] = "sans-serif"
-    plt.rcParams['font.sans-serif'] = "Helvetica"
-    plt.rcParams['axes.labelsize'] = 14
-    plt.rcParams['font.size'] = 14
-    plt.rcParams['legend.fontsize'] = 14
-    plt.rcParams['xtick.labelsize'] = 14
-    plt.rcParams['ytick.labelsize'] = 14
-
-    almost_black = '#262626'
-    # change the tick colors also to the almost black
-    plt.rcParams['ytick.color'] = almost_black
-    plt.rcParams['xtick.color'] = almost_black
-
-    # change the text colors also to the almost black
-    plt.rcParams['text.color'] = almost_black
-
-    # Change the default axis colors from black to a slightly lighter black,
-    # and a little thinner (0.5 instead of 1)
-    plt.rcParams['axes.edgecolor'] = almost_black
-    plt.rcParams['axes.labelcolor'] = almost_black
-
-    ax1 = fig.add_subplot(131)
-    ax2 = fig.add_subplot(132)
-    ax3 = fig.add_subplot(133)
-
-    ax1.plot(np.arange(48)/2, An_bl)
-    ax1.set_ylabel("$A_{\mathrm{n}}$ ($\mathrm{\mu}$mol m$^{-2}$ s$^{-1}$)")
-
-    ax2.plot(np.arange(48)/2, et_bl * c.MOL_TO_MMOL, label="Big leaf")
-    ax2.set_ylabel("E (mmol m$^{-2}$ s$^{-1}$)")
-    ax2.set_xlabel("Hour of day")
-
-    ax3.plot(np.arange(48)/2., tair, label="Tair")
-    ax3.plot(np.arange(48)/2., tcan_bl, label="Tcanopy")
-    ax3.set_ylabel("Temperature (deg C)")
-    ax3.legend(numpoints=1, loc="best")
-
-    ax1.locator_params(nbins=6, axis="y")
-    ax2.locator_params(nbins=6, axis="y")
-
-    plt.show()

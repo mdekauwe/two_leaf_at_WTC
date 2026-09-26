@@ -5,9 +5,6 @@ Plot the model vs obs.
 
 """
 import os
-import sys
-import numpy as np
-import math
 import pandas as pd
 
 import matplotlib.pyplot as plt
@@ -39,13 +36,13 @@ ax2 = fig.add_subplot(122)
 
 ax1.plot(df.An_can, label="Model")
 ax1.plot(df.An_obs, label="Observations")
-ax1.set_ylabel("GPP (g C m$^{-2}$ d$^{-1}$)")
-ax1.set_xlabel("Days", position=(1.1, 0.5))
+ax1.set_ylabel("A$_{n}$ (\u03BCmol m$^{-2}$ s$^{-1}$)")
+ax1.set_xlabel("Time step", position=(1.1, 0.5))
 ax1.legend(numpoints=1, loc="best")
 
 ax2.plot(df.E_can, label="Model")
 ax2.plot(df.E_obs, label="Observations")
-ax2.set_ylabel("E (mm d$^{-1}$)")
+ax2.set_ylabel("E (mol m$^{-2}$ s$^{-1}$)")
 
 ax1.locator_params(nbins=6, axis="y")
 ax2.locator_params(nbins=6, axis="y")

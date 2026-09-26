@@ -52,7 +52,7 @@ def calc_esat(tair):
     Returns:
     --------
     esat : float
-        Saturation vapor pressure (Pa K-1)
+        Saturation vapor pressure (Pa)
 
     References:
     * Buck, A. (1981) New equations for computing vapor pressure and

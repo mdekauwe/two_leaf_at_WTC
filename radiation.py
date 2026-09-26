@@ -4,7 +4,6 @@
 Various radiation funcs needed for the two-leaf approximation
 """
 
-import sys
 import numpy as np
 import math
 import constants as c
@@ -12,6 +11,10 @@ import constants as c
 __author__  = "Martin De Kauwe"
 __version__ = "1.0 (09.11.2018)"
 __email__   = "mdekauwe@gmail.com"
+
+# Gaussian integration weights & cos(15 45 75 degrees)
+GAUSS_W = np.array([0.308, 0.514, 0.178])
+COS3 = np.cos(np.deg2rad([15.0, 45.0, 75.0]))
 
 
 def spitters(doy, sw_rad, cos_zenith):
@@ -92,9 +95,7 @@ def calculate_absorbed_radiation(p, par, cos_zenith, lai, direct_frac,
     lai_leaf = np.zeros(2)
     cexpk_dash_d = np.zeros(2)
     k_dash_d = np.zeros(2)
-    kbx = np.zeros(3)
-    gauss_w = np.array([0.308, 0.514, 0.178]) # Gaussian integ. weights
-    cos3 = np.zeros(3)
+    gauss_w = GAUSS_W
     c1 = np.zeros(3)
     rho_td = np.zeros(2)
     k_dash_b = np.zeros(2)
@@ -125,16 +126,7 @@ def calculate_absorbed_radiation(p, par, cos_zenith, lai, direct_frac,
     # soil long-wave radiation
     flws = c.SIGMA * p.emissivity_soil * tsurf**4
 
-    # cos(15 45 75 degrees)
-    cos3[0] = np.cos(np.deg2rad(15.0))
-    cos3[1] = np.cos(np.deg2rad(45.0))
-    cos3[2] = np.cos(np.deg2rad(75.0))
-
-    # leaf angle parmameter 1
-    xphi1 = 0.5 - p.chi * (0.633 + 0.33 * p.chi)
-
-    # leaf angle parmameter 2
-    xphi2 = 0.877 * (1.0 - 2.0 * xphi1)
+    (xphi1, xphi2) = calc_leaf_angle_params(p)
 
     # Ross-Goudriaan function is the ratio of the projected area of leaves
     # in the direction perpendicular to the direction of incident solar
@@ -149,18 +141,7 @@ def calculate_absorbed_radiation(p, par, cos_zenith, lai, direct_frac,
     else:   # i.e. bare soil
         kb = 0.5
 
-    # extinction coefficient of diffuse radiation for a canopy with black
-    # leaves, eq 27 Kowalcyk et al. 2006
-    if lai > c.LAI_THRESH:  # vegetated
-
-        # Approximate integration of kb
-        kbx[0] = (xphi1 + xphi2 * cos3[0]) / cos3[0]
-        kbx[1] = (xphi1 + xphi2 * cos3[1]) / cos3[1]
-        kbx[2] = (xphi1 + xphi2 * cos3[2]) / cos3[2]
-
-        kd = -np.log(np.sum(gauss_w * np.exp(-kbx * lai))) / lai
-    else:   # i.e. bare soil
-        kd = 0.7
+    (kd, kbx) = calc_kd(p, lai)
 
     if np.abs(kb - kd) < c.RAD_THRESH:
         kb = kd + c.RAD_THRESH
@@ -192,9 +173,9 @@ def calculate_absorbed_radiation(p, par, cos_zenith, lai, direct_frac,
     else:
         sfact = 0.68
 
-    # soil + snow reflectance (ignoring snow)
-    albsoilsn[c.SHADED] = 2.0 * p.soil_reflectance / (1. + sfact)
-    albsoilsn[c.SUNLIT] = sfact * albsoilsn[c.SHADED]
+    # soil + snow reflectance (ignoring snow), by waveband
+    albsoilsn[c.NIR] = 2.0 * p.soil_reflectance / (1. + sfact)
+    albsoilsn[c.VIS] = sfact * albsoilsn[c.NIR]
 
     # Update extinction coefficients and fractional transmittance for
     # leaf transmittance and reflection (ie. NOT black leaves):
@@ -254,14 +235,17 @@ def calculate_absorbed_radiation(p, par, cos_zenith, lai, direct_frac,
     a3 = psi_func(kb + kd, lai)
     a4 = 1.0 - p.emissivity_soil
     a5 = (p.emissivity_leaf - emissivity_air)
-    a6 = psi_func(2.0 * kd, lai) * psi_func(kb - kd, lai)
+    # soil-reflected LW reaching the sunlit leaves, i.e. the downward deficit
+    # at the soil, exp(-kd L), integrated back up through the sunlit fraction.
+    # Equivalent to CABLE's (transd - transb) / (kb - kd).
+    a6 = np.exp(-kd * lai) * psi_func(kb - kd, lai)
     qcan[c.SUNLIT,c.LW] = a1 * (a2 * a3 + a4 * a5 * a6)
 
     # Longwave radiation absorbed by shaded leaves under isothermal conditions
     # B19 Wang and Leuning 1998
     a3 = psi_func(kd, lai)
     a6 = np.exp(-kd * lai) * a3
-    qcan[c.SHADED,c.LW] = a1 * (a2 * a3 - a4 * a5 * a6) - qcan[c.SUNLIT,c.LW]
+    qcan[c.SHADED,c.LW] = a1 * (a2 * a3 + a4 * a5 * a6) - qcan[c.SUNLIT,c.LW]
 
     apar[c.SUNLIT] = qcan[c.SUNLIT,c.VIS] * c.J_TO_UMOL
     apar[c.SHADED] = qcan[c.SHADED,c.VIS] * c.J_TO_UMOL
@@ -278,7 +262,40 @@ def calculate_absorbed_radiation(p, par, cos_zenith, lai, direct_frac,
 
     lai_leaf[c.SHADED] = lai - lai_leaf[c.SUNLIT]
 
-    return (qcan, apar, lai_leaf, kb)
+    return (qcan, apar, lai_leaf, kb, kd)
+
+def calc_leaf_angle_params(p):
+    """
+    Leaf angle parameters of the Ross-Goudriaan function, eqn 28 Kowalcyk
+    et al. 2006
+    """
+    # leaf angle parmameter 1
+    xphi1 = 0.5 - p.chi * (0.633 + 0.33 * p.chi)
+
+    # leaf angle parmameter 2
+    xphi2 = 0.877 * (1.0 - 2.0 * xphi1)
+
+    return (xphi1, xphi2)
+
+def calc_kd(p, lai):
+    """
+    Extinction coefficient of diffuse radiation for a canopy with black
+    leaves, eq 27 Kowalcyk et al. 2006. Also returns the beam extinction
+    coefficients at 15, 45 & 75 degrees used in the approximate integration.
+    """
+    kbx = np.zeros(3)
+
+    if lai > c.LAI_THRESH:  # vegetated
+        (xphi1, xphi2) = calc_leaf_angle_params(p)
+
+        # Approximate integration of kb
+        kbx = (xphi1 + xphi2 * COS3) / COS3
+
+        kd = -np.log(np.sum(GAUSS_W * np.exp(-kbx * lai))) / lai
+    else:   # i.e. bare soil
+        kd = 0.7
+
+    return (kd, kbx)
 
 def psi_func(z, lai):
     # B5 function from Wang and Leuning which integrates property passed via
@@ -342,3 +359,72 @@ def calc_leaf_to_canopy_scalar(lai, k=None, kn=None, kb=None, big_leaf=False):
         scalex[c.SHADED] = (1.0 - np.exp(-kn * lai)) / kn - scalex[c.SUNLIT]
 
     return scalex
+
+def calc_conductance_scalars(lai, a, kd, kb=None, lai_leaf=None):
+    """
+    Scalars to go from single-leaf to canopy (per unit ground area) boundary
+    layer and radiative conductances, so that they are consistent with the
+    canopy-scale absorbed radiation and stomatal conductance, following CABLE
+    (Wang & Leuning 1998; Kowalczyk et al. 2006).
+
+    Forced convection: the leaf conductance at the canopy top declines with
+    wind, u(xi) = u_top * exp(-a * xi / 2) with xi the cumulative LAI from the
+    top (gb ~ sqrt(u)), integrated over the sunlit/shaded leaf area. When a is
+    zero this is simply the sunlit/shaded LAI.
+
+    Free convection: sunlit/shaded LAI.
+
+    Radiation: the linearised long-wave loss of leaves at depth xi escapes
+    upwards, exp(-kd xi), and downwards, exp(-kd (L - xi)), weighted by the
+    sunlit fraction, exp(-kb xi). For a single leaf the scalar is 2 (two
+    sided).
+
+    Parameters:
+    ----------
+    lai : float
+        leaf area index
+    a : float
+        within-canopy wind extinction coefficient (-)
+    kd : float
+        diffuse extinction coefficient
+    kb : float
+        beam extinction coefficient (2-leaf only)
+    lai_leaf : array
+        sunlit/shaded LAI (2-leaf only); if None return big-leaf scalars
+
+    Returns:
+    --------
+    f_forced, f_free, f_rad : float or array
+        scalars (m2 leaf m-2 ground) for forced convection, free convection
+        and radiative conductance. Multiply the one-sided leaf gbH terms and
+        the single-sided leaf radiative conductance respectively.
+
+    References:
+    ----------
+    * Wang and Leuning (1998) AFm, 91, 89-111.
+    * Kowalczyk et al. (2006) CSIRO Marine and Atmospheric Research Paper 13.
+    """
+    tau_d = np.exp(-kd * lai)
+
+    # whole-canopy integrals
+    if a < 1E-06:
+        forced_tot = lai
+    else:
+        forced_tot = (2.0 / a) * (1.0 - np.exp(-0.5 * a * lai))
+    rad_tot = 2.0 * (1.0 - tau_d)
+
+    if lai_leaf is None:
+        return (forced_tot, lai, rad_tot)
+
+    tau_b = np.exp(-min(kb * lai, 30.0))
+
+    f_forced = np.zeros(2)
+    f_forced[c.SUNLIT] = psi_func(kb + 0.5 * a, lai)
+    f_forced[c.SHADED] = forced_tot - f_forced[c.SUNLIT]
+
+    f_rad = np.zeros(2)
+    f_rad[c.SUNLIT] = kd * ((1.0 - tau_b * tau_d) / (kb + kd) + \
+                            (tau_d - tau_b) / (kb - kd))
+    f_rad[c.SHADED] = rad_tot - f_rad[c.SUNLIT]
+
+    return (f_forced, np.asarray(lai_leaf, dtype=float), f_rad)
