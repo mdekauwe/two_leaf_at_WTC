@@ -94,8 +94,10 @@ class Canopy(object):
         sw_rad[c.VIS] = 0.5 * (par * c.PAR_2_SW) # W m-2
         sw_rad[c.NIR] = 0.5 * (par * c.PAR_2_SW) # W m-2
 
-        # get diffuse/beam frac, just use VIS as the answer is the same for NIR
-        (diffuse_frac, direct_frac) = spitters(doy, sw_rad[c.VIS], cos_zenith)
+        # get diffuse/beam frac. Spitters' relationship is between the
+        # atmospheric transmissivity of global radiation and the diffuse
+        # fraction, so it needs the total SW, not just the VIS half.
+        (diffuse_frac, direct_frac) = spitters(doy, np.sum(sw_rad), cos_zenith)
 
         (qcan, apar,
          lai_leaf, kb, kd) = calculate_absorbed_radiation(p, par, cos_zenith,
